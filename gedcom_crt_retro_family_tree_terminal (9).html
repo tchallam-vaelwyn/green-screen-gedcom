@@ -1,0 +1,1881 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#020d03] text-[#00ff66]">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VT-1970 GEDCOM FAMILY TREE TERMINAL</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Fonts: Retro Terminal CRT Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap" rel="stylesheet">
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            green: {
+              300: '#99ffbb',
+              400: '#33ff77',
+              500: '#00ff66',
+              600: '#00cc52',
+              700: '#00993d',
+              900: '#003314'
+            },
+            dark: {
+              base: '#020d03',
+              surface: '#07180a',
+              card: '#0b2410',
+              border: '#006629'
+            }
+          },
+          fontFamily: {
+            sans: ['"Share Tech Mono"', '"VT323"', 'Courier', 'monospace'],
+            mono: ['"Share Tech Mono"', '"VT323"', 'Courier', 'monospace']
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      font-family: 'Share Tech Mono', 'VT323', Courier, monospace;
+      background-color: #020d03;
+      color: #00ff66;
+      text-shadow: 0 0 4px rgba(0, 255, 102, 0.6), 0 0 8px rgba(0, 255, 102, 0.3);
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    /* Scanlines overlay effect */
+    body::before {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.35) 50%), 
+                  linear-gradient(90deg, rgba(0, 255, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 255, 0, 0.03));
+      z-index: 999;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+
+    /* CRT Vignette Screen Curve Border */
+    body::after {
+      content: " ";
+      display: block;
+      position: fixed;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: radial-gradient(circle, rgba(0,0,0,0) 60%, rgba(0,10,2,0.85) 100%);
+      z-index: 998;
+      pointer-events: none;
+    }
+
+    /* Green Phosphor Card Style */
+    .crt-card {
+      background-color: #07180a;
+      border: 1px solid #00ff66;
+      border-radius: 0.25rem;
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.2), inset 0 0 15px rgba(0, 255, 102, 0.05);
+    }
+
+    /* Input styling */
+    .crt-input {
+      background-color: #051a0c;
+      border: 1px solid #00ff66;
+      color: #00ff66;
+      border-radius: 0.25rem;
+      font-family: 'Share Tech Mono', monospace;
+      text-shadow: 0 0 4px rgba(0, 255, 102, 0.6);
+    }
+    .crt-input::placeholder {
+      color: rgba(0, 255, 102, 0.45);
+      text-shadow: 0 0 3px rgba(0, 255, 102, 0.3);
+    }
+    .crt-input:focus {
+      outline: none;
+      border-color: #00ff66;
+      box-shadow: 0 0 12px rgba(0, 255, 102, 0.7), inset 0 0 6px rgba(0, 255, 102, 0.2);
+      background-color: #092612;
+    }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar {
+      width: 10px;
+      height: 10px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #020d03;
+      border-left: 1px solid #00aa44;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #008833;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #00ff66;
+    }
+
+    /* Blinking Cursor */
+    .blink {
+      animation: blinker 1s step-end infinite;
+    }
+    @keyframes blinker {
+      50% { opacity: 0; }
+    }
+
+    /* Tree Node Hover Glow */
+    .tree-node-rect {
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .tree-node-rect:hover {
+      filter: drop-shadow(0px 0px 8px #00ff66);
+    }
+
+    /* Drag Drop Highlight */
+    .drag-over {
+      background-color: rgba(0, 255, 102, 0.15) !important;
+      border-color: #00ff66 !important;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-[#00ff66] p-3 md:p-6 font-mono flex flex-col justify-between">
+
+  <div>
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toastMessage" class="hidden mb-4 crt-card p-4 bg-[#00ff66]/10 border-[#00ff66] flex items-center justify-between text-xs text-[#00ff66] z-50 relative">
+      <span id="toastText"></span>
+      <button id="toastCloseBtn" class="text-[#00ff66] hover:text-white font-bold ml-4">[X]</button>
+    </div>
+
+    <!-- MAIN SYSTEM HEADER -->
+    <header class="crt-card p-4 mb-5 flex flex-col md:flex-row justify-between items-center gap-4">
+      <div class="flex items-center space-x-3 w-full md:w-auto">
+        <div class="w-10 h-10 bg-[#00ff66]/10 border border-[#00ff66] flex items-center justify-center text-[#00ff66] text-xl shrink-0">
+          <i class="fa-solid fa-sitemap"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-2 text-sm font-bold tracking-wider">
+            <span>SYS_VT1970 // GENEALOGICAL GRAPH ANALYZER</span>
+            <span class="blink">_</span>
+          </div>
+          <p class="text-[11px] text-[#00ff66]/70 uppercase tracking-widest">GEDCOM FILE MATRIX VISUALIZER SYSTEM</p>
+        </div>
+      </div>
+
+      <!-- Header actions visible after file load -->
+      <div id="headerActions" class="hidden flex items-center gap-3 w-full md:w-auto justify-end flex-wrap">
+        <span id="fileMetaTag" class="text-xs bg-[#003314] px-2 py-1 border border-[#00aa44] text-[#00ff66]">
+          NO FILE LOADED
+        </span>
+        <button id="btnChangeFile" class="crt-btn px-3 py-1 bg-[#07180a] text-xs transition flex items-center gap-2">
+          <i class="fa-solid fa-folder-open"></i> [LOAD DIFFERENT GEDCOM]
+        </button>
+      </div>
+    </header>
+
+    <!-- SCREEN 1: FILE SELECTION / LOAD PROMPT -->
+    <section id="screenLoader" class="crt-card p-6 md:p-10 space-y-8 max-w-4xl mx-auto my-8">
+      <div class="border-b border-[#00aa44]/40 pb-4">
+        <h1 class="text-xl md:text-2xl font-bold tracking-widest flex items-center gap-2 text-[#00ff66]">
+          <i class="fa-solid fa-terminal"></i> INITIALIZATION: SELECT GEDCOM FILE
+        </h1>
+        <p class="text-xs text-[#00ff66]/70 mt-1">PLEASE PROVIDE A STANDARD GEDCOM GENEALOGY DATASET (.GED, .GEDCOM, OR .TXT)</p>
+      </div>
+
+      <!-- DRAG & DROP ZONE -->
+      <div id="dropZone" class="crt-card p-8 text-center border-2 border-dashed border-[#00aa44] hover:border-[#00ff66] transition cursor-pointer space-y-4 bg-[#020d03]/80">
+        <div class="text-4xl text-[#00ff66]/80"><i class="fa-solid fa-file-arrow-up"></i></div>
+        <div class="space-y-1">
+          <p class="text-sm uppercase font-bold tracking-wider">DRAG & DROP YOUR GEDCOM FILE HERE</p>
+          <p class="text-xs text-[#00ff66]/60">OR CLICK TO BROWSE LOCAL STORAGE DISK</p>
+        </div>
+        <input type="file" id="fileInput" accept=".ged,.gedcom,.txt" class="hidden" />
+        <button type="button" id="btnBrowse" class="crt-btn px-4 py-2 bg-[#07180a] text-xs inline-block text-[#00ff66]">
+          [ SELECT FILE FROM DISK ]
+        </button>
+      </div>
+
+      <!-- OR DEMO DATASET BUTTON -->
+      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#00aa44]/40">
+        <div>
+          <span class="text-xs uppercase text-[#00ff66]/80 font-bold">&gt; NO GEDCOM FILE HANDY?</span>
+          <p class="text-[11px] text-[#00ff66]/60">Load built-in 4-generation sample family dataset (28 Individuals, 8 Families)</p>
+        </div>
+        <button id="btnLoadDemo" class="crt-btn px-4 py-2 bg-[#00ff66] text-[#020d03] text-xs font-bold transition shrink-0" style="text-shadow:none;">
+          <i class="fa-solid fa-flask"></i> [ LOAD DEMO DATASET ]
+        </button>
+      </div>
+
+      <!-- SYSTEM LOG CONSOLE -->
+      <div class="bg-[#020d03] border border-[#00aa44]/50 p-3 text-[11px] font-mono space-y-1">
+        <div class="text-[#00ff66]/50">&gt; SYSTEM READY. AWAITING GEDCOM INPUT STREAM...</div>
+        <div class="text-[#00ff66]/50">&gt; COMPATIBLE WITH GEDCOM v5.5 / 5.5.1 SPECIFICATIONS.</div>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: MAIN WORKSPACE (HIDDEN UNTIL FILE LOADED) -->
+    <main id="screenWorkspace" class="hidden space-y-5">
+
+      <!-- NAVIGATION TABS -->
+      <div class="flex flex-wrap items-center gap-2 border-b border-[#00aa44]/40 pb-2">
+        <button data-tab="visualizer" class="nav-tab crt-btn px-4 py-1.5 text-xs font-bold bg-[#00ff66] text-[#020d03]" style="text-shadow:none;">
+          <i class="fa-solid fa-diagram-project"></i> [1] TREE VISUALIZER
+        </button>
+        <button data-tab="directory" class="nav-tab crt-btn px-4 py-1.5 text-xs bg-[#07180a] text-[#00ff66]">
+          <i class="fa-solid fa-address-book"></i> [2] INDIVIDUAL DIRECTORY
+        </button>
+        <button data-tab="analytics" class="nav-tab crt-btn px-4 py-1.5 text-xs bg-[#07180a] text-[#00ff66]">
+          <i class="fa-solid fa-chart-pie"></i> [3] SURNAME & METRICS ANALYTICS
+        </button>
+        <button data-tab="raw" class="nav-tab crt-btn px-4 py-1.5 text-xs bg-[#07180a] text-[#00ff66]">
+          <i class="fa-solid fa-code"></i> [4] RAW GEDCOM INSPECTOR
+        </button>
+        <button data-tab="kinship" class="nav-tab crt-btn px-4 py-1.5 text-xs bg-[#07180a] text-[#00ff66]">
+          <i class="fa-solid fa-calculator"></i> [5] KINSHIP CALCULATOR
+        </button>
+      </div>
+
+      <!-- TAB 1: FAMILY TREE VISUALIZER VIEW -->
+      <div id="tabVisualizer" class="tab-content space-y-4">
+        
+        <!-- VISUALIZER CONTROLS PANEL -->
+        <div class="crt-card p-4 space-y-4">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 items-end">
+            
+            <!-- Target Individual Selection -->
+            <div class="lg:col-span-5 relative">
+              <label for="individualSearchInput" class="block text-xs uppercase tracking-wider text-[#00ff66]/80 mb-1">
+                &gt; FOCUS INDIVIDUAL (SEARCH BY NAME OR ID):
+              </label>
+              <div class="relative flex items-center">
+                <span class="absolute left-2.5 text-[#00ff66] font-bold text-xs pointer-events-none">&gt;</span>
+                <input type="text" id="individualSearchInput" placeholder="TYPE NAME OR ID (e.g. John Doe)..." class="w-full crt-input pl-7 pr-3 py-1.5 text-xs uppercase font-mono" />
+                <div id="autocompleteDropdown" class="hidden absolute top-full left-0 right-0 bg-[#07180a] border border-[#00ff66] z-40 max-h-56 overflow-y-auto mt-1 shadow-[0_0_15px_rgba(0,255,102,0.3)]"></div>
+              </div>
+            </div>
+
+            <!-- Ancestor Generations Level Slider/Number -->
+            <div class="lg:col-span-2">
+              <div class="flex justify-between items-center mb-1">
+                <label for="ancestorGenInput" class="text-[11px] uppercase text-[#00ff66]/80">ANCESTORS:</label>
+                <span id="ancestorGenVal" class="text-xs font-bold text-[#00ff66]">2 GEN</span>
+              </div>
+              <input type="range" id="ancestorGenInput" min="0" max="6" value="2" class="w-full accent-[#00ff66] bg-[#020d03] cursor-pointer" />
+            </div>
+
+            <!-- Descendant Generations Level Slider/Number -->
+            <div class="lg:col-span-2">
+              <div class="flex justify-between items-center mb-1">
+                <label for="descendantGenInput" class="text-[11px] uppercase text-[#00ff66]/80">DESCENDANTS:</label>
+                <span id="descendantGenVal" class="text-xs font-bold text-[#00ff66]">2 GEN</span>
+              </div>
+              <input type="range" id="descendantGenInput" min="0" max="6" value="2" class="w-full accent-[#00ff66] bg-[#020d03] cursor-pointer" />
+            </div>
+
+            <!-- Node Spacing / Spread Slider -->
+            <div class="lg:col-span-2">
+              <div class="flex justify-between items-center mb-1">
+                <label for="nodeSpacingInput" class="text-[11px] uppercase text-[#00ff66]/80">NODE SPACING:</label>
+                <span id="nodeSpacingVal" class="text-xs font-bold text-[#00ff66]">WIDE</span>
+              </div>
+              <input type="range" id="nodeSpacingInput" min="40" max="260" value="140" step="10" class="w-full accent-[#00ff66] bg-[#020d03] cursor-pointer" />
+            </div>
+
+            <!-- Additional Toggles -->
+            <div class="lg:col-span-3 flex items-center justify-between gap-2 flex-wrap">
+              <label class="flex items-center gap-2 text-xs uppercase cursor-pointer select-none">
+                <input type="checkbox" id="toggleSpouses" checked class="accent-[#00ff66]" />
+                <span>SPOUSES</span>
+              </label>
+              <label class="flex items-center gap-2 text-xs uppercase cursor-pointer select-none">
+                <input type="checkbox" id="toggleSiblings" checked class="accent-[#00ff66]" />
+                <span>SIBLINGS</span>
+              </label>
+              <button id="btnResetView" class="crt-btn px-2 py-1 bg-[#07180a] text-xs text-[#00ff66]" title="Center View">
+                [RE-CENTER]
+              </button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- SVG TREE CONTAINER & SIDE DETAILS PANEL -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          <!-- Interactive SVG Diagram Area -->
+          <div class="lg:col-span-8 crt-card p-2 relative h-[580px] overflow-hidden flex flex-col justify-between bg-[#020d03]" id="treeCanvasWrapper">
+            
+            <!-- Canvas HUD Bar -->
+            <div class="absolute top-3 left-3 right-3 z-10 flex justify-between items-center pointer-events-none">
+              <div class="bg-[#07180a]/90 border border-[#00aa44] px-2 py-1 text-[11px] text-[#00ff66] pointer-events-auto flex items-center gap-2">
+                <i class="fa-solid fa-crosshairs"></i>
+                <span id="focusPersonLabel">FOCUS: NONE</span>
+              </div>
+              <div class="bg-[#07180a]/90 border border-[#00aa44] px-2 py-1 text-[10px] text-[#00ff66]/70 pointer-events-auto">
+                CLICK NODE = FOCUS | DRAG = PAN CANVAS
+              </div>
+            </div>
+
+            <!-- SVG DOM Container -->
+            <svg id="treeSvg" class="w-full h-full cursor-grab active:cursor-grabbing select-none" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="lineGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stop-color="#00ff66" stop-opacity="0.8"/>
+                  <stop offset="100%" stop-color="#006629" stop-opacity="0.4"/>
+                </linearGradient>
+              </defs>
+              <g id="treeViewport">
+                <!-- Lines & Nodes dynamically inserted here -->
+              </g>
+            </svg>
+
+            <!-- Zoom / Pan HUD Overlay Controls -->
+            <div class="absolute bottom-3 right-3 z-10 flex items-center gap-1 bg-[#07180a]/90 border border-[#00aa44] p-1">
+              <button id="btnZoomIn" class="px-2 py-0.5 hover:bg-[#00ff66] hover:text-[#020d03] text-xs font-bold">+</button>
+              <button id="btnZoomOut" class="px-2 py-0.5 hover:bg-[#00ff66] hover:text-[#020d03] text-xs font-bold">-</button>
+              <button id="btnZoomReset" class="px-2 py-0.5 hover:bg-[#00ff66] hover:text-[#020d03] text-xs">RESET</button>
+            </div>
+          </div>
+
+          <!-- Selected Person Inspector Panel -->
+          <div class="lg:col-span-4 crt-card p-4 space-y-4 flex flex-col justify-between">
+            <div>
+              <h2 class="text-xs uppercase tracking-widest text-[#00ff66] border-b border-[#00aa44]/40 pb-2 flex items-center gap-2 font-bold">
+                <i class="fa-solid fa-user"></i> &gt; INDIVIDUAL INSPECTOR
+              </h2>
+
+              <div id="inspectorContent" class="space-y-4 mt-3">
+                <p class="text-xs text-[#00ff66]/60 italic">[SELECT A PERSON NODE IN THE TREE OR SEARCH DIRECTORY TO INSPECT DETAILS]</p>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-[#00aa44]/40 flex justify-between text-[11px] text-[#00ff66]/70">
+              <span id="statIndiCount">INDIVIDUALS: 0</span>
+              <span id="statFamCount">FAMILIES: 0</span>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- TAB 2: INDIVIDUAL DIRECTORY / SEARCH TABLE -->
+      <div id="tabDirectory" class="tab-content hidden crt-card p-4 space-y-4">
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <h2 class="text-xs uppercase tracking-widest text-[#00ff66] font-bold flex items-center gap-2">
+            <i class="fa-solid fa-users"></i> &gt; ALL INDIVIDUAL RECORDS
+          </h2>
+          <div class="relative w-full sm:w-72 flex items-center">
+            <span class="absolute left-2.5 text-[#00ff66] font-bold text-xs pointer-events-none">&gt;</span>
+            <input type="text" id="dirSearchInput" placeholder="FILTER DIRECTORY BY NAME/DATE..." class="crt-input pl-7 pr-3 py-1 text-xs w-full uppercase" />
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="border-b border-[#00aa44] text-[#00ff66]/80 uppercase bg-[#020d03]">
+                <th class="p-2">ID</th>
+                <th class="p-2">NAME</th>
+                <th class="p-2">SEX</th>
+                <th class="p-2">BORN</th>
+                <th class="p-2">DIED</th>
+                <th class="p-2">FAMC (PARENTS)</th>
+                <th class="p-2">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="directoryTableBody" class="divide-y divide-[#00aa44]/30">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: SURNAME & METRICS ANALYTICS -->
+      <div id="tabAnalytics" class="tab-content hidden crt-card p-4 space-y-5">
+        <h2 class="text-xs uppercase tracking-widest text-[#00ff66] font-bold flex items-center gap-2">
+          <i class="fa-solid fa-chart-line"></i> &gt; GENEALOGICAL DATABASE METRICS
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div class="bg-[#020d03] border border-[#00aa44] p-4 text-center space-y-1">
+            <div id="metricTotalIndis" class="text-3xl font-extrabold text-[#00ff66]">0</div>
+            <div class="text-[11px] uppercase text-[#00ff66]/70">TOTAL INDIVIDUALS</div>
+          </div>
+          <div class="bg-[#020d03] border border-[#00aa44] p-4 text-center space-y-1">
+            <div id="metricTotalFams" class="text-3xl font-extrabold text-[#00ff66]">0</div>
+            <div class="text-[11px] uppercase text-[#00ff66]/70">TOTAL FAMILIES</div>
+          </div>
+          <div class="bg-[#020d03] border border-[#00aa44] p-4 text-center space-y-1">
+            <div id="metricAvgGenSpan" class="text-3xl font-extrabold text-[#00ff66]">0</div>
+            <div class="text-[11px] uppercase text-[#00ff66]/70">UNIQUE SURNAMES</div>
+          </div>
+        </div>
+
+        <div>
+          <h3 class="text-xs font-bold uppercase text-[#00ff66] mb-3">&gt; TOP SURNAMES DISTRIBUTION</h3>
+          <div id="surnameBars" class="space-y-2">
+            <!-- Dynamically populated surname bars -->
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 4: RAW GEDCOM INSPECTOR -->
+      <div id="tabRaw" class="tab-content hidden crt-card p-4 space-y-3">
+        <div class="flex justify-between items-center">
+          <h2 class="text-xs uppercase tracking-widest text-[#00ff66] font-bold flex items-center gap-2">
+            <i class="fa-solid fa-file-code"></i> &gt; RAW GEDCOM SOURCE VIEWER
+          </h2>
+          <span id="rawLineCount" class="text-xs text-[#00ff66]/70">0 LINES</span>
+        </div>
+        <textarea id="rawGedcomArea" class="w-full h-96 crt-input p-3 text-xs font-mono bg-[#020d03] resize-y" readonly></textarea>
+      </div>
+
+      <!-- TAB 5: RELATIONSHIP & KINSHIP CALCULATOR -->
+      <div id="tabKinship" class="tab-content hidden crt-card p-4 md:p-6 space-y-6">
+        <div class="border-b border-[#00aa44]/40 pb-3 flex justify-between items-center flex-wrap gap-2">
+          <h2 class="text-xs uppercase tracking-widest text-[#00ff66] font-bold flex items-center gap-2">
+            <i class="fa-solid fa-calculator"></i> &gt; KINSHIP & RELATIONSHIP CALCULATOR
+          </h2>
+          <span class="text-[11px] text-[#00ff66]/70">SELECT TWO INDIVIDUALS TO ANALYZE GENEALOGICAL BOND</span>
+        </div>
+
+        <!-- PERSON SELECTION CARDS -->
+        <div class="grid grid-cols-1 md:grid-cols-11 gap-4 items-center">
+          <!-- Person A -->
+          <div class="md:col-span-5 bg-[#020d03] p-4 border border-[#00aa44] space-y-2">
+            <label class="block text-xs uppercase font-bold text-[#00ff66] tracking-wider">&gt; INDIVIDUAL A:</label>
+            <div class="relative">
+              <input type="text" id="kinshipSearchA" placeholder="SEARCH PERSON A..." class="w-full crt-input pl-3 pr-3 py-1.5 text-xs uppercase font-mono" />
+              <div id="kinshipDropdownA" class="hidden absolute top-full left-0 right-0 bg-[#07180a] border border-[#00ff66] z-50 max-h-48 overflow-y-auto mt-1 shadow-[0_0_15px_rgba(0,255,102,0.3)]"></div>
+            </div>
+            <div id="kinshipCardA" class="text-xs text-[#00ff66]/80 pt-1">
+              <span class="italic text-[#00ff66]/50">[NO SELECTION]</span>
+            </div>
+          </div>
+
+          <!-- Swap / Compare Action -->
+          <div class="md:col-span-1 flex flex-col items-center justify-center gap-2 py-2">
+            <button id="btnSwapKinship" class="crt-btn px-3 py-2 bg-[#07180a] text-xs text-[#00ff66] w-full flex items-center justify-center" title="SWAP INDIVIDUALS">
+              <i class="fa-solid fa-right-left"></i>
+            </button>
+          </div>
+
+          <!-- Person B -->
+          <div class="md:col-span-5 bg-[#020d03] p-4 border border-[#00aa44] space-y-2">
+            <label class="block text-xs uppercase font-bold text-[#00ff66] tracking-wider">&gt; INDIVIDUAL B:</label>
+            <div class="relative">
+              <input type="text" id="kinshipSearchB" placeholder="SEARCH PERSON B..." class="w-full crt-input pl-3 pr-3 py-1.5 text-xs uppercase font-mono" />
+              <div id="kinshipDropdownB" class="hidden absolute top-full left-0 right-0 bg-[#07180a] border border-[#00ff66] z-50 max-h-48 overflow-y-auto mt-1 shadow-[0_0_15px_rgba(0,255,102,0.3)]"></div>
+            </div>
+            <div id="kinshipCardB" class="text-xs text-[#00ff66]/80 pt-1">
+              <span class="italic text-[#00ff66]/50">[NO SELECTION]</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- CALCULATE BUTTON -->
+        <div class="text-center">
+          <button id="btnComputeKinship" class="crt-btn px-6 py-2.5 bg-[#00ff66] text-[#020d03] text-xs font-bold uppercase transition" style="text-shadow:none;">
+            <i class="fa-solid fa-network-wired"></i> [ COMPUTE RELATIONSHIP MATRIX ]
+          </button>
+        </div>
+
+        <!-- KINSHIP RESULT DISPLAY BOX -->
+        <div id="kinshipResultBox" class="bg-[#020d03] border-2 border-[#00ff66] p-5 space-y-4 hidden">
+          <div class="text-center space-y-1 border-b border-[#00aa44] pb-3">
+            <div class="text-[10px] uppercase text-[#00ff66]/70 tracking-widest">DETERMINED RELATIONSHIP BOND</div>
+            <h3 id="kinshipTitle" class="text-xl md:text-2xl font-black text-[#00ff66] tracking-wider">--</h3>
+            <p id="kinshipSubtitle" class="text-xs text-[#00ff66]/80 font-mono"></p>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <!-- Common Ancestor Info -->
+            <div class="bg-[#07180a] p-3 border border-[#00aa44] space-y-1">
+              <div class="font-bold text-[#00ff66] uppercase border-b border-[#00aa44]/40 pb-1">&gt; LOWEST COMMON ANCESTOR (LCA)</div>
+              <div id="kinshipLcaInfo" class="pt-1 text-[#00ff66]/90">NONE DETECTED</div>
+            </div>
+
+            <!-- Metrics Summary -->
+            <div class="bg-[#07180a] p-3 border border-[#00aa44] space-y-1">
+              <div class="font-bold text-[#00ff66] uppercase border-b border-[#00aa44]/40 pb-1">&gt; GENERATION DISTANCE</div>
+              <div id="kinshipMetrics" class="pt-1 text-[#00ff66]/90">--</div>
+            </div>
+          </div>
+
+          <!-- PEDIGREE PATH TRACE -->
+          <div class="space-y-2">
+            <div class="text-xs font-bold text-[#00ff66] uppercase tracking-wider">&gt; LINEAGE CONNECTION PATH:</div>
+            <div id="kinshipPathVisual" class="bg-[#051a0c] p-4 border border-[#00aa44] font-mono text-xs overflow-x-auto space-y-2">
+              <!-- Dynamically built step path -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="mt-8 text-center text-[11px] text-[#00ff66]/50 border-t border-[#00aa44]/30 pt-3">
+    [VT100 TERMINAL] GEDCOM DATASET ANALYZER &bull; STANDALONE CRT CLIENT SYSTEM
+  </footer>
+
+  <script>
+    // SAMPLE GEDCOM DATASET (Used when "LOAD DEMO DATASET" is clicked)
+    const SAMPLE_GEDCOM = `0 HEAD
+1 SOUR VT100_GENEALOGY
+1 GEDC
+2 VERS 5.5
+2 FORM LINEAGE-LINKED
+0 @I1@ INDI
+1 NAME Arthur /Pendelton/
+1 SEX M
+1 BIRT
+2 DATE 12 MAY 1922
+2 PLAC London, England
+1 DEAT
+2 DATE 18 OCT 1998
+2 PLAC Oxford, England
+1 FAMS @F1@
+0 @I2@ INDI
+1 NAME Margaret /Winchester/
+1 SEX F
+1 BIRT
+2 DATE 04 APR 1925
+2 PLAC Bristol, England
+1 DEAT
+2 DATE 02 FEB 2005
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME George /Pendelton/
+1 SEX M
+1 BIRT
+2 DATE 19 AUG 1948
+2 PLAC London, England
+1 FAMC @F1@
+1 FAMS @F2@
+0 @I4@ INDI
+1 NAME Elizabeth /Sterling/
+1 SEX F
+1 BIRT
+2 DATE 30 NOV 1950
+2 PLAC Cambridge, England
+1 FAMS @F2@
+0 @I5@ INDI
+1 NAME Edward /Pendelton/
+1 SEX M
+1 BIRT
+2 DATE 14 JUL 1975
+2 PLAC London, England
+1 FAMC @F2@
+1 FAMS @F3@
+0 @I6@ INDI
+1 NAME Victoria /Pendelton/
+1 SEX F
+1 BIRT
+2 DATE 03 MAR 1978
+2 PLAC London, England
+1 FAMC @F2@
+0 @I7@ INDI
+1 NAME Sarah /Harrison/
+1 SEX F
+1 BIRT
+2 DATE 22 SEP 1977
+2 PLAC Manchester, England
+1 FAMS @F3@
+0 @I8@ INDI
+1 NAME Thomas /Pendelton/
+1 SEX M
+1 BIRT
+2 DATE 11 JAN 2005
+2 PLAC London, England
+1 FAMC @F3@
+0 @I9@ INDI
+1 NAME Charlotte /Pendelton/
+1 SEX F
+1 BIRT
+2 DATE 08 AUG 2009
+2 PLAC London, England
+1 FAMC @F3@
+0 @I10@ INDI
+1 NAME Henry /Sterling/
+1 SEX M
+1 BIRT
+2 DATE 15 JAN 1920
+1 DEAT
+2 DATE 05 JUN 1989
+1 FAMS @F4@
+0 @I11@ INDI
+1 NAME Catherine /Montgomery/
+1 SEX F
+1 BIRT
+2 DATE 28 AUG 1924
+1 FAMS @F4@
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 MARR
+2 DATE 08 JUN 1946
+0 @F2@ FAM
+1 HUSB @I3@
+1 WIFE @I4@
+1 CHIL @I5@
+1 CHIL @I6@
+1 MARR
+2 DATE 18 APR 1972
+0 @F3@ FAM
+1 HUSB @I5@
+1 WIFE @I7@
+1 CHIL @I8@
+1 CHIL @I9@
+1 MARR
+2 DATE 04 OCT 2002
+0 @F4@ FAM
+1 HUSB @I10@
+1 WIFE @I11@
+1 CHIL @I4@
+0 TRLR`;
+
+    // APPLICATION STATE
+    let gedcomRawText = '';
+    let parsedData = {
+      individuals: {}, // id -> object
+      families: {},    // id -> object
+      surnames: {}     // surname -> count
+    };
+    let focusIndiId = null;
+
+    let kinshipPersonA = null;
+    let kinshipPersonB = null;
+
+    // Viewport transform for SVG Canvas
+    let svgPan = { x: 0, y: 0 };
+    let svgScale = 1.0;
+    let isDragging = false;
+    let dragStart = { x: 0, y: 0 };
+
+    function showNotification(msg) {
+      const toast = document.getElementById('toastMessage');
+      const text = document.getElementById('toastText');
+      if (toast && text) {
+        text.textContent = `[SYSTEM MESSAGE]: ${msg}`;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+          toast.classList.add('hidden');
+        }, 5000);
+      }
+    }
+
+    // Clean name formatting (removes slashes from GEDCOM standard e.g. John /Doe/ -> John Doe)
+    function formatGedcomName(rawName) {
+      if (!rawName) return 'UNKNOWN';
+      return rawName.replace(/\//g, '').trim();
+    }
+
+    function extractSurname(rawName) {
+      if (!rawName) return 'UNKNOWN';
+      const match = rawName.match(/\/(.*?)\//);
+      if (match && match[1]) return match[1].trim().toUpperCase();
+      const parts = rawName.trim().split(' ');
+      return parts[parts.length - 1].toUpperCase();
+    }
+
+    function parseGedcom(text) {
+      gedcomRawText = text;
+      const lines = text.split(/\r?\n/);
+      
+      const individuals = {};
+      const families = {};
+      const surnames = {};
+
+      let currentRec = null;
+      let currentType = null; // 'INDI' or 'FAM'
+      let currentSubTag = null;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+
+        const parts = line.split(' ');
+        const level = parseInt(parts[0], 10);
+        if (isNaN(level)) continue;
+
+        let tag = parts[1] ? parts[1].toUpperCase() : '';
+        let rest = parts.slice(2).join(' ');
+
+        // Check if level 0 record definition e.g. "0 @I1@ INDI"
+        if (level === 0) {
+          if (parts[2] && (parts[2].toUpperCase() === 'INDI' || parts[2].toUpperCase() === 'FAM')) {
+            const id = parts[1].replace(/@/g, '');
+            currentType = parts[2].toUpperCase();
+            if (currentType === 'INDI') {
+              currentRec = {
+                id: id,
+                name: '',
+                surname: '',
+                sex: 'U',
+                birthDate: '',
+                birthPlace: '',
+                deathDate: '',
+                deathPlace: '',
+                famc: null, // family where child
+                fams: []   // families where spouse
+              };
+              individuals[id] = currentRec;
+            } else if (currentType === 'FAM') {
+              currentRec = {
+                id: id,
+                husb: null,
+                wife: null,
+                children: [],
+                marrDate: '',
+                marrPlace: ''
+              };
+              families[id] = currentRec;
+            }
+          } else {
+            currentRec = null;
+            currentType = null;
+          }
+          currentSubTag = null;
+          continue;
+        }
+
+        if (!currentRec) continue;
+
+        // Parse INDI fields
+        if (currentType === 'INDI') {
+          if (level === 1) {
+            currentSubTag = tag;
+            if (tag === 'NAME') {
+              currentRec.name = formatGedcomName(rest);
+              currentRec.surname = extractSurname(rest);
+              if (currentRec.surname) {
+                surnames[currentRec.surname] = (surnames[currentRec.surname] || 0) + 1;
+              }
+            } else if (tag === 'SEX') {
+              currentRec.sex = rest.toUpperCase().charAt(0) || 'U';
+            } else if (tag === 'FAMC') {
+              currentRec.famc = rest.replace(/@/g, '');
+            } else if (tag === 'FAMS') {
+              currentRec.fams.push(rest.replace(/@/g, ''));
+            }
+          } else if (level === 2) {
+            if (currentSubTag === 'BIRT') {
+              if (tag === 'DATE') currentRec.birthDate = rest;
+              if (tag === 'PLAC') currentRec.birthPlace = rest;
+            } else if (currentSubTag === 'DEAT') {
+              if (tag === 'DATE') currentRec.deathDate = rest;
+              if (tag === 'PLAC') currentRec.deathPlace = rest;
+            }
+          }
+        }
+
+        // Parse FAM fields
+        else if (currentType === 'FAM') {
+          if (level === 1) {
+            currentSubTag = tag;
+            if (tag === 'HUSB') {
+              currentRec.husb = rest.replace(/@/g, '');
+            } else if (tag === 'WIFE') {
+              currentRec.wife = rest.replace(/@/g, '');
+            } else if (tag === 'CHIL') {
+              currentRec.children.push(rest.replace(/@/g, ''));
+            }
+          } else if (level === 2) {
+            if (currentSubTag === 'MARR') {
+              if (tag === 'DATE') currentRec.marrDate = rest;
+              if (tag === 'PLAC') currentRec.marrPlace = rest;
+            }
+          }
+        }
+      }
+
+      parsedData = { individuals, families, surnames };
+      return parsedData;
+    }
+
+    function getRelativesTree(rootId, maxAncestors, maxDescendants, includeSpouses, includeSiblings) {
+      if (!parsedData.individuals[rootId]) return { nodes: [], links: [] };
+
+      const nodesMap = new Map();
+      const links = [];
+
+      // Recursive Ancestor Traversal
+      function traverseAncestors(indiId, genLevel, childX, childY) {
+        if (genLevel > maxAncestors) return;
+        const indi = parsedData.individuals[indiId];
+        if (!indi) return;
+
+        if (!nodesMap.has(indiId)) {
+          nodesMap.set(indiId, {
+            id: indiId,
+            indi: indi,
+            gen: -genLevel, // negative for ancestors
+            role: genLevel === 0 ? 'ROOT' : 'ANCESTOR'
+          });
+        }
+
+        if (genLevel < maxAncestors && indi.famc) {
+          const fam = parsedData.families[indi.famc];
+          if (fam) {
+            if (fam.husb) {
+              links.push({ source: fam.husb, target: indiId, type: 'parent' });
+              traverseAncestors(fam.husb, genLevel + 1);
+            }
+            if (fam.wife) {
+              links.push({ source: fam.wife, target: indiId, type: 'parent' });
+              traverseAncestors(fam.wife, genLevel + 1);
+            }
+          }
+        }
+
+        // Include Siblings if enabled
+        if (includeSiblings && genLevel === 0 && indi.famc) {
+          const fam = parsedData.families[indi.famc];
+          if (fam && fam.children) {
+            fam.children.forEach(childId => {
+              if (childId !== indiId && !nodesMap.has(childId)) {
+                nodesMap.set(childId, {
+                  id: childId,
+                  indi: parsedData.individuals[childId],
+                  gen: 0,
+                  role: 'SIBLING'
+                });
+                if (fam.husb) links.push({ source: fam.husb, target: childId, type: 'parent' });
+                if (fam.wife) links.push({ source: fam.wife, target: childId, type: 'parent' });
+              }
+            });
+          }
+        }
+      }
+
+      // Recursive Descendant Traversal
+      function traverseDescendants(indiId, genLevel) {
+        if (genLevel > maxDescendants) return;
+        const indi = parsedData.individuals[indiId];
+        if (!indi) return;
+
+        if (!nodesMap.has(indiId)) {
+          nodesMap.set(indiId, {
+            id: indiId,
+            indi: indi,
+            gen: genLevel,
+            role: genLevel === 0 ? 'ROOT' : 'DESCENDANT'
+          });
+        }
+
+        if (genLevel < maxDescendants && indi.fams.length > 0) {
+          indi.fams.forEach(famId => {
+            const fam = parsedData.families[famId];
+            if (fam) {
+              // Include spouse
+              if (includeSpouses) {
+                const spouseId = (fam.husb === indiId) ? fam.wife : fam.husb;
+                if (spouseId && parsedData.individuals[spouseId] && !nodesMap.has(spouseId)) {
+                  nodesMap.set(spouseId, {
+                    id: spouseId,
+                    indi: parsedData.individuals[spouseId],
+                    gen: genLevel,
+                    role: 'SPOUSE'
+                  });
+                  links.push({ source: indiId, target: spouseId, type: 'spouse' });
+                }
+              }
+
+              // Children
+              if (fam.children) {
+                fam.children.forEach(childId => {
+                  links.push({ source: indiId, target: childId, type: 'parent' });
+                  traverseDescendants(childId, genLevel + 1);
+                });
+              }
+            }
+          });
+        }
+      }
+
+      traverseAncestors(rootId, 0);
+      traverseDescendants(rootId, 0);
+
+      return { nodes: Array.from(nodesMap.values()), links };
+    }
+
+    function renderSvgTree() {
+      const viewport = document.getElementById('treeViewport');
+      if (!viewport) return;
+      viewport.innerHTML = '';
+
+      if (!focusIndiId || !parsedData.individuals[focusIndiId]) {
+        return;
+      }
+
+      const ancGen = parseInt(document.getElementById('ancestorGenInput').value, 10);
+      const descGen = parseInt(document.getElementById('descendantGenInput').value, 10);
+      const incSpouses = document.getElementById('toggleSpouses').checked;
+      const incSiblings = document.getElementById('toggleSiblings').checked;
+
+      const treeData = getRelativesTree(focusIndiId, ancGen, descGen, incSpouses, incSiblings);
+      const indi = parsedData.individuals[focusIndiId];
+      if (indi) {
+        document.getElementById('focusPersonLabel').textContent = `FOCUS: ${indi.name.toUpperCase()} (${indi.id})`;
+      }
+
+      const { nodes, links } = treeData;
+
+      // Read dynamic spacing settings from slider
+      const gapX = parseInt(document.getElementById('nodeSpacingInput')?.value || '140', 10);
+      const nodeWidth = 140;
+      const nodeHeight = 55;
+      const layerHeight = Math.max(130, nodeHeight + gapX * 0.65);
+
+      // 1. Group nodes into connected family components to layout distinct clusters
+      const adj = new Map();
+      nodes.forEach(n => adj.set(n.id, new Set()));
+      links.forEach(l => {
+        if (adj.has(l.source) && adj.has(l.target)) {
+          adj.get(l.source).add(l.target);
+          adj.get(l.target).add(l.source);
+        }
+      });
+
+      const visited = new Set();
+      const clusters = [];
+
+      nodes.forEach(n => {
+        if (!visited.has(n.id)) {
+          const clusterNodes = [];
+          const q = [n.id];
+          visited.add(n.id);
+
+          while (q.length > 0) {
+            const curr = q.shift();
+            const nodeObj = nodes.find(item => item.id === curr);
+            if (nodeObj) clusterNodes.push(nodeObj);
+
+            adj.get(curr)?.forEach(neighbor => {
+              if (!visited.has(neighbor)) {
+                visited.add(neighbor);
+                q.push(neighbor);
+              }
+            });
+          }
+          clusters.push(clusterNodes);
+        }
+      });
+
+      const coords = {}; // id -> {x, y}
+      let currentClusterXOffset = 0;
+
+      // 2. Compute coordinates for each cluster independently
+      clusters.forEach(cluster => {
+        const genGroups = {};
+        cluster.forEach(node => {
+          if (!genGroups[node.gen]) genGroups[node.gen] = [];
+          genGroups[node.gen].push(node);
+        });
+
+        const sortedGens = Object.keys(genGroups).map(Number).sort((a, b) => a - b);
+        let minClusterX = Infinity;
+        let maxClusterX = -Infinity;
+
+        sortedGens.forEach(gen => {
+          const rawGroup = genGroups[gen];
+          
+          // Re-order nodes in generation to keep spouses adjacent
+          const orderedGroup = [];
+          const processedInGen = new Set();
+
+          rawGroup.forEach(node => {
+            if (processedInGen.has(node.id)) return;
+            orderedGroup.push(node);
+            processedInGen.add(node.id);
+
+            // Find spouse in same generation layer
+            links.forEach(l => {
+              if (l.type === 'spouse') {
+                const partnerId = l.source === node.id ? l.target : (l.target === node.id ? l.source : null);
+                if (partnerId && !processedInGen.has(partnerId)) {
+                  const partnerNode = rawGroup.find(gn => gn.id === partnerId);
+                  if (partnerNode) {
+                    orderedGroup.push(partnerNode);
+                    processedInGen.add(partnerId);
+                  }
+                }
+              }
+            });
+          });
+
+          // Compute horizontal position with spacing
+          const totalGenWidth = orderedGroup.length * nodeWidth + (orderedGroup.length - 1) * gapX;
+          const startX = currentClusterXOffset - totalGenWidth / 2 + nodeWidth / 2;
+          const y = gen * layerHeight;
+
+          orderedGroup.forEach((node, idx) => {
+            let x = startX + idx * (nodeWidth + gapX);
+            coords[node.id] = { x, y };
+            minClusterX = Math.min(minClusterX, x - nodeWidth / 2);
+            maxClusterX = Math.max(maxClusterX, x + nodeWidth / 2);
+          });
+        });
+
+        // Shift offset for next disconnected family cluster
+        if (maxClusterX > -Infinity && minClusterX < Infinity) {
+          currentClusterXOffset += (maxClusterX - minClusterX) + gapX * 1.8;
+        }
+      });
+
+      // Render Connection Lines
+      links.forEach(link => {
+        const src = coords[link.source];
+        const tgt = coords[link.target];
+        if (!src || !tgt) return;
+
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        let d = '';
+
+        if (link.type === 'spouse') {
+          // Horizontal line between spouses
+          d = `M ${src.x} ${src.y} L ${tgt.x} ${tgt.y}`;
+          path.setAttribute('stroke', '#00ff66');
+          path.setAttribute('stroke-dasharray', '4,3');
+        } else {
+          // Curved orthogonal line for parents to child
+          const midY = (src.y + tgt.y) / 2;
+          d = `M ${src.x} ${src.y + nodeHeight/2} C ${src.x} ${midY}, ${tgt.x} ${midY}, ${tgt.x} ${tgt.y - nodeHeight/2}`;
+          path.setAttribute('stroke', 'url(#lineGlow)');
+        }
+
+        path.setAttribute('d', d);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke-width', '2');
+        viewport.appendChild(path);
+      });
+
+      // Render Nodes
+      nodes.forEach(node => {
+        const pos = coords[node.id];
+        if (!pos) return;
+
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.setAttribute('transform', `translate(${pos.x - nodeWidth/2}, ${pos.y - nodeHeight/2})`);
+        g.classList.add('tree-node-group');
+
+        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+        rect.setAttribute('width', nodeWidth);
+        rect.setAttribute('height', nodeHeight);
+        rect.setAttribute('rx', '4');
+        rect.setAttribute('fill', node.id === focusIndiId ? '#00ff66' : '#07180a');
+        rect.setAttribute('stroke', '#00ff66');
+        rect.setAttribute('stroke-width', node.id === focusIndiId ? '2' : '1');
+        rect.classList.add('tree-node-rect');
+
+        // Click to focus node
+        g.addEventListener('click', (e) => {
+          e.stopPropagation();
+          setFocusIndividual(node.id);
+        });
+
+        // Name text
+        const nameText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        nameText.setAttribute('x', nodeWidth / 2);
+        nameText.setAttribute('y', '20');
+        nameText.setAttribute('text-anchor', 'middle');
+        nameText.setAttribute('fill', node.id === focusIndiId ? '#020d03' : '#00ff66');
+        nameText.setAttribute('font-size', '11');
+        nameText.setAttribute('font-weight', 'bold');
+        nameText.textContent = node.indi.name.length > 18 ? node.indi.name.substring(0, 16) + '..' : node.indi.name;
+
+        // Dates text
+        const dateText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        dateText.setAttribute('x', nodeWidth / 2);
+        dateText.setAttribute('y', '36');
+        dateText.setAttribute('text-anchor', 'middle');
+        dateText.setAttribute('fill', node.id === focusIndiId ? '#020d03' : 'rgba(0,255,102,0.8)');
+        dateText.setAttribute('font-size', '10');
+        const bDate = node.indi.birthDate ? node.indi.birthDate.substring(node.indi.birthDate.length - 4) : '?';
+        const dDate = node.indi.deathDate ? node.indi.deathDate.substring(node.indi.deathDate.length - 4) : '';
+        dateText.textContent = `b.${bDate} ${dDate ? 'd.' + dDate : ''}`;
+
+        // Role badge
+        const roleText = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        roleText.setAttribute('x', nodeWidth / 2);
+        roleText.setAttribute('y', '48');
+        roleText.setAttribute('text-anchor', 'middle');
+        roleText.setAttribute('fill', node.id === focusIndiId ? '#020d03' : '#00aa44');
+        roleText.setAttribute('font-size', '8');
+        roleText.textContent = `[${node.role}]`;
+
+        g.appendChild(rect);
+        g.appendChild(nameText);
+        g.appendChild(dateText);
+        g.appendChild(roleText);
+        viewport.appendChild(g);
+      });
+
+      updateInspectorPanel();
+    }
+
+    function setFocusIndividual(id) {
+      if (!parsedData.individuals[id]) return;
+      focusIndiId = id;
+      const indi = parsedData.individuals[id];
+      document.getElementById('focusPersonLabel').textContent = `FOCUS: ${indi.name.toUpperCase()} (${indi.id})`;
+      renderSvgTree();
+    }
+
+    function updateInspectorPanel() {
+      const container = document.getElementById('inspectorContent');
+      if (!container) return;
+
+      if (!focusIndiId || !parsedData.individuals[focusIndiId]) {
+        container.innerHTML = `<p class="text-xs text-[#00ff66]/60 italic">[NO INDIVIDUAL SELECTED]</p>`;
+        return;
+      }
+
+      const indi = parsedData.individuals[focusIndiId];
+      
+      // Get relatives details
+      let parentsHtml = 'NONE';
+      if (indi.famc && parsedData.families[indi.famc]) {
+        const fam = parsedData.families[indi.famc];
+        const father = fam.husb && parsedData.individuals[fam.husb] ? parsedData.individuals[fam.husb].name : null;
+        const mother = fam.wife && parsedData.individuals[fam.wife] ? parsedData.individuals[fam.wife].name : null;
+        parentsHtml = `${father ? `<div>F: <a href="#" onclick="setFocusIndividual('${fam.husb}')" class="underline">${father}</a></div>` : ''}` +
+                      `${mother ? `<div>M: <a href="#" onclick="setFocusIndividual('${fam.wife}')" class="underline">${mother}</a></div>` : ''}`;
+      }
+
+      let spousesChildrenHtml = '';
+      if (indi.fams.length > 0) {
+        indi.fams.forEach(famId => {
+          const fam = parsedData.families[famId];
+          if (fam) {
+            const spouseId = (fam.husb === indi.id) ? fam.wife : fam.husb;
+            const spouseName = spouseId && parsedData.individuals[spouseId] ? parsedData.individuals[spouseId].name : 'UNKNOWN';
+            spousesChildrenHtml += `<div class="mt-2 border-t border-[#00aa44]/30 pt-1">`;
+            spousesChildrenHtml += `<div>SPOUSE: ${spouseId ? `<a href="#" onclick="setFocusIndividual('${spouseId}')" class="underline">${spouseName}</a>` : 'NONE'}</div>`;
+            if (fam.children.length > 0) {
+              spousesChildrenHtml += `<div class="text-[11px] text-[#00ff66]/80 mt-1">CHILDREN (${fam.children.length}):</div><ul class="list-disc list-inside pl-1">`;
+              fam.children.forEach(cId => {
+                const child = parsedData.individuals[cId];
+                if (child) {
+                  spousesChildrenHtml += `<li><a href="#" onclick="setFocusIndividual('${cId}')" class="underline">${child.name}</a></li>`;
+                }
+              });
+              spousesChildrenHtml += `</ul>`;
+            }
+            spousesChildrenHtml += `</div>`;
+          }
+        });
+      } else {
+        spousesChildrenHtml = '<div>SPOUSES/CHILDREN: NONE</div>';
+      }
+
+      container.innerHTML = `
+        <div class="space-y-3 bg-[#020d03] p-3 border border-[#00aa44]">
+          <div class="border-b border-[#00aa44] pb-2">
+            <h3 class="text-sm font-bold text-[#00ff66]">${indi.name}</h3>
+            <span class="text-[10px] text-[#00ff66]/70 uppercase">ID: @${indi.id}@ | SEX: ${indi.sex}</span>
+          </div>
+
+          <div class="text-xs space-y-1">
+            <div><strong>BORN:</strong> ${indi.birthDate || 'UNKNOWN'} ${indi.birthPlace ? `(${indi.birthPlace})` : ''}</div>
+            <div><strong>DIED:</strong> ${indi.deathDate || 'N/A'} ${indi.deathPlace ? `(${indi.deathPlace})` : ''}</div>
+          </div>
+
+          <div class="text-xs space-y-1 border-t border-[#00aa44]/40 pt-2">
+            <strong class="block uppercase text-[10px] text-[#00ff66]/70">&gt; PARENTS:</strong>
+            ${parentsHtml}
+          </div>
+
+          <div class="text-xs border-t border-[#00aa44]/40 pt-2">
+            <strong class="block uppercase text-[10px] text-[#00ff66]/70">&gt; FAMILIES / SPOUSES:</strong>
+            ${spousesChildrenHtml}
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button onclick="setKinshipPerson('A', '${indi.id}')" class="crt-btn py-1 text-[10px] bg-[#07180a] text-[#00ff66]">
+              [SET AS PERSON A]
+            </button>
+            <button onclick="setKinshipPerson('B', '${indi.id}')" class="crt-btn py-1 text-[10px] bg-[#07180a] text-[#00ff66]">
+              [SET AS PERSON B]
+            </button>
+          </div>
+
+          <button onclick="setFocusIndividual('${indi.id}')" class="crt-btn w-full py-1 text-xs bg-[#07180a] text-[#00ff66] mt-2">
+            [ RE-CENTER TREE ON THIS PERSON ]
+          </button>
+        </div>
+      `;
+    }
+
+    function renderDirectoryTable(filter = '') {
+      const tbody = document.getElementById('directoryTableBody');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      const list = Object.values(parsedData.individuals);
+      const filtered = list.filter(i => 
+        i.name.toLowerCase().includes(filter.toLowerCase()) || 
+        i.id.toLowerCase().includes(filter.toLowerCase()) ||
+        i.surname.toLowerCase().includes(filter.toLowerCase())
+      );
+
+      filtered.forEach(indi => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-[#00ff66]/10 transition cursor-pointer';
+        tr.innerHTML = `
+          <td class="p-2 font-bold">@${indi.id}@</td>
+          <td class="p-2 text-[#00ff66] font-bold">${indi.name}</td>
+          <td class="p-2">${indi.sex}</td>
+          <td class="p-2">${indi.birthDate || '-'}</td>
+          <td class="p-2">${indi.deathDate || '-'}</td>
+          <td class="p-2">${indi.famc ? '@' + indi.famc + '@' : '-'}</td>
+          <td class="p-2">
+            <button onclick="setFocusIndividual('${indi.id}'); switchTab('visualizer');" class="crt-btn px-2 py-0.5 text-[10px] bg-[#07180a]">
+              [VIEW TREE]
+            </button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderAnalytics() {
+      const indiCount = Object.keys(parsedData.individuals).length;
+      const famCount = Object.keys(parsedData.families).length;
+      const surnameCount = Object.keys(parsedData.surnames).length;
+
+      document.getElementById('metricTotalIndis').textContent = indiCount;
+      document.getElementById('metricTotalFams').textContent = famCount;
+      document.getElementById('metricAvgGenSpan').textContent = surnameCount;
+
+      document.getElementById('statIndiCount').textContent = `INDIVIDUALS: ${indiCount}`;
+      document.getElementById('statFamCount').textContent = `FAMILIES: ${famCount}`;
+
+      // Render top 8 surnames
+      const sortedSurnames = Object.entries(parsedData.surnames)
+        .sort((a,b) => b[1] - a[1])
+        .slice(0, 8);
+
+      const container = document.getElementById('surnameBars');
+      if (!container) return;
+      container.innerHTML = '';
+
+      const maxCount = sortedSurnames.length > 0 ? sortedSurnames[0][1] : 1;
+
+      sortedSurnames.forEach(([surname, count]) => {
+        const pct = Math.round((count / maxCount) * 100);
+        const row = document.createElement('div');
+        row.className = 'space-y-1 text-xs';
+        row.innerHTML = `
+          <div class="flex justify-between">
+            <span class="font-bold">${surname}</span>
+            <span>${count} RECORDS (${pct}%)</span>
+          </div>
+          <div class="w-full bg-[#020d03] h-3 border border-[#00aa44]">
+            <div class="bg-[#00ff66] h-full" style="width: ${pct}%;"></div>
+          </div>
+        `;
+        container.appendChild(row);
+      });
+    }
+
+    function resetCanvasTransform() {
+      svgPan = { x: 300, y: 150 };
+      svgScale = 1.0;
+      applyCanvasTransform();
+    }
+
+    function applyCanvasTransform() {
+      const viewport = document.getElementById('treeViewport');
+      if (viewport) {
+        viewport.setAttribute('transform', `translate(${svgPan.x}, ${svgPan.y}) scale(${svgScale})`);
+      }
+    }
+
+    function switchTab(tabKey) {
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        if (btn.dataset.tab === tabKey) {
+          btn.classList.add('bg-[#00ff66]', 'text-[#020d03]');
+          btn.classList.remove('bg-[#07180a]', 'text-[#00ff66]');
+          btn.style.textShadow = 'none';
+        } else {
+          btn.classList.remove('bg-[#00ff66]', 'text-[#020d03]');
+          btn.classList.add('bg-[#07180a]', 'text-[#00ff66]');
+          btn.style.textShadow = '';
+        }
+      });
+
+      document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.add('hidden');
+      });
+
+      if (tabKey === 'visualizer') document.getElementById('tabVisualizer').classList.remove('hidden');
+      if (tabKey === 'directory') {
+        document.getElementById('tabDirectory').classList.remove('hidden');
+        renderDirectoryTable();
+      }
+      if (tabKey === 'analytics') {
+        document.getElementById('tabAnalytics').classList.remove('hidden');
+        renderAnalytics();
+      }
+      if (tabKey === 'raw') {
+        document.getElementById('tabRaw').classList.remove('hidden');
+        document.getElementById('rawGedcomArea').value = gedcomRawText;
+        document.getElementById('rawLineCount').textContent = `${gedcomRawText.split(/\r?\n/).length} LINES`;
+      }
+      if (tabKey === 'kinship') {
+        document.getElementById('tabKinship').classList.remove('hidden');
+        updateKinshipCards();
+      }
+    }
+
+    function getAncestorsWithPaths(startId) {
+      const ancestorsMap = new Map();
+      const queue = [{ id: startId, dist: 0, path: [startId] }];
+      const visited = new Set([startId]);
+
+      ancestorsMap.set(startId, { dist: 0, path: [startId] });
+
+      while (queue.length > 0) {
+        const curr = queue.shift();
+        const indi = parsedData.individuals[curr.id];
+        if (!indi || !indi.famc) continue;
+
+        const fam = parsedData.families[indi.famc];
+        if (!fam) continue;
+
+        const parents = [];
+        if (fam.husb && parsedData.individuals[fam.husb]) parents.push(fam.husb);
+        if (fam.wife && parsedData.individuals[fam.wife]) parents.push(fam.wife);
+
+        parents.forEach(pId => {
+          if (!visited.has(pId)) {
+            visited.add(pId);
+            const newPath = [...curr.path, pId];
+            const newDist = curr.dist + 1;
+            ancestorsMap.set(pId, { dist: newDist, path: newPath });
+            queue.push({ id: pId, dist: newDist, path: newPath });
+          }
+        });
+      }
+
+      return ancestorsMap;
+    }
+
+    function getOrdinalSuffix(n) {
+      const s = ["TH", "ST", "ND", "RD"];
+      const v = n % 100;
+      return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    function calculateRelationship(idA, idB) {
+      if (!idA || !idB || !parsedData.individuals[idA] || !parsedData.individuals[idB]) {
+        return { title: 'INVALID SELECTION', subtitle: 'Please select two valid individuals.', lca: null, metrics: '--', path: [] };
+      }
+
+      const indiA = parsedData.individuals[idA];
+      const indiB = parsedData.individuals[idB];
+
+      if (idA === idB) {
+        return {
+          title: 'SAME INDIVIDUAL',
+          subtitle: `${indiA.name} is the exact same individual record.`,
+          lca: indiA.name,
+          metrics: '0 Generations',
+          path: [idA]
+        };
+      }
+
+      // 1. Direct Spouse Check
+      let directSpouse = false;
+      indiA.fams.forEach(fId => {
+        const fam = parsedData.families[fId];
+        if (fam && ((fam.husb === idA && fam.wife === idB) || (fam.wife === idA && fam.husb === idB))) {
+          directSpouse = true;
+        }
+      });
+
+      if (directSpouse) {
+        const title = indiB.sex === 'M' ? 'HUSBAND' : (indiB.sex === 'F' ? 'WIFE' : 'SPOUSE');
+        return {
+          title: title,
+          subtitle: `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`,
+          lca: 'DIRECT SPOUSE / MARRIAGE BOND',
+          metrics: '0 Generations (Marital)',
+          path: [idA, idB]
+        };
+      }
+
+      // 2. Ancestor Path Search
+      const ancA = getAncestorsWithPaths(idA);
+      const ancB = getAncestorsWithPaths(idB);
+
+      let bestLca = null;
+      let minTotalDist = Infinity;
+
+      ancA.forEach((valA, ancId) => {
+        if (ancB.has(ancId)) {
+          const valB = ancB.get(ancId);
+          const totalDist = valA.dist + valB.dist;
+          if (totalDist < minTotalDist) {
+            minTotalDist = totalDist;
+            bestLca = {
+              id: ancId,
+              distA: valA.dist,
+              distB: valB.dist,
+              pathA: valA.path,
+              pathB: valB.path
+            };
+          }
+        }
+      });
+
+      if (bestLca) {
+        const lcaIndi = parsedData.individuals[bestLca.id];
+        const dA = bestLca.distA; // Dist from A up to LCA
+        const dB = bestLca.distB; // Dist from B up to LCA
+        const sexB = indiB.sex;
+
+        let title = '';
+        let subtitle = '';
+
+        // Construct complete lineage path: A -> LCA -> B
+        const fullPath = [...bestLca.pathA, ...[...bestLca.pathB].reverse().slice(1)];
+
+        // Case: Direct Lineal Ancestor (dB = 0 => B is in A's ancestor tree, dA generations above A)
+        if (dB === 0) {
+          if (dA === 1) {
+            title = sexB === 'M' ? 'FATHER' : (sexB === 'F' ? 'MOTHER' : 'PARENT');
+          } else if (dA === 2) {
+            title = sexB === 'M' ? 'GRANDFATHER' : (sexB === 'F' ? 'GRANDMOTHER' : 'GRANDPARENT');
+          } else {
+            const greats = dA - 2;
+            const prefix = 'GREAT-'.repeat(greats);
+            title = prefix + (sexB === 'M' ? 'GRANDFATHER' : (sexB === 'F' ? 'GRANDMOTHER' : 'GRANDPARENT'));
+          }
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} (${dA} generation${dA > 1 ? 's' : ''} direct ancestor) of ${indiA.name}.`;
+        }
+        // Case: Direct Lineal Descendant (dA = 0 => A is in B's ancestor tree, dB generations below A)
+        else if (dA === 0) {
+          if (dB === 1) {
+            title = sexB === 'M' ? 'SON' : (sexB === 'F' ? 'DAUGHTER' : 'CHILD');
+          } else if (dB === 2) {
+            title = sexB === 'M' ? 'GRANDSON' : (sexB === 'F' ? 'GRANDDAUGHTER' : 'GRANDCHILD');
+          } else {
+            const greats = dB - 2;
+            const prefix = 'GREAT-'.repeat(greats);
+            title = prefix + (sexB === 'M' ? 'GRANDSON' : (sexB === 'F' ? 'GRANDDAUGHTER' : 'GRANDCHILD'));
+          }
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} (${dB} generation${dB > 1 ? 's' : ''} direct descendant) of ${indiA.name}.`;
+        }
+        // Case: Siblings (dA = 1, dB = 1)
+        else if (dA === 1 && dB === 1) {
+          // Check for full vs half siblings
+          let sharedParentsCount = 0;
+          if (indiA.famc && indiB.famc && indiA.famc === indiB.famc) {
+            sharedParentsCount = 2;
+          } else {
+            sharedParentsCount = 1;
+          }
+
+          const base = sexB === 'M' ? 'BROTHER' : (sexB === 'F' ? 'SISTER' : 'SIBLING');
+          title = sharedParentsCount === 2 ? `FULL ${base}` : `HALF-${base}`;
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`;
+        }
+        // Case: Aunt / Uncle (dA = 2, dB = 1 => B is sibling of A's parent)
+        else if (dA === 2 && dB === 1) {
+          title = sexB === 'M' ? 'UNCLE' : (sexB === 'F' ? 'AUNT' : 'AUNT/UNCLE');
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`;
+        }
+        // Case: Great Aunt / Uncle (dA > 2, dB = 1)
+        else if (dA > 2 && dB === 1) {
+          const greats = dA - 2;
+          const prefix = 'GREAT-'.repeat(greats);
+          const base = sexB === 'M' ? 'UNCLE' : (sexB === 'F' ? 'AUNT' : 'AUNT/UNCLE');
+          title = prefix + base;
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`;
+        }
+        // Case: Niece / Nephew (dA = 1, dB = 2 => B is child of A's sibling)
+        else if (dA === 1 && dB === 2) {
+          title = sexB === 'M' ? 'NEPHEW' : (sexB === 'F' ? 'NIECE' : 'NIECE/NEPHEW');
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`;
+        }
+        // Case: Great Niece / Nephew (dA = 1, dB > 2)
+        else if (dA === 1 && dB > 2) {
+          const greats = dB - 2;
+          const prefix = 'GREAT-'.repeat(greats);
+          const base = sexB === 'M' ? 'NEPHEW' : (sexB === 'F' ? 'NIECE' : 'NIECE/NEPHEW');
+          title = prefix + base;
+          subtitle = `${indiB.name} is the ${title.toLowerCase()} of ${indiA.name}.`;
+        }
+        // Case: Cousins (dA >= 2, dB >= 2)
+        else {
+          const cousinDegree = Math.min(dA, dB) - 1;
+          const removed = Math.abs(dA - dB);
+
+          const degreeText = getOrdinalSuffix(cousinDegree);
+          const removedText = removed > 0 ? ` ${removed}X REMOVED` : '';
+
+          title = `${degreeText} COUSIN${removedText}`;
+          subtitle = `${indiB.name} and ${indiA.name} are ${title.toLowerCase()} via ${lcaIndi ? lcaIndi.name : 'Common Ancestor'}.`;
+        }
+
+        return {
+          title: title,
+          subtitle: subtitle,
+          lca: lcaIndi ? `${lcaIndi.name} (@${lcaIndi.id}@)` : 'LCA DETECTED',
+          metrics: `Distance A: ${dA} gen | Distance B: ${dB} gen`,
+          path: fullPath
+        };
+      }
+
+      // No Direct Blood LCA found
+      return {
+        title: 'NO DIRECT BLOOD RELATION FOUND',
+        subtitle: `No common biological ancestor found in dataset between ${indiA.name} and ${indiB.name}.`,
+        lca: 'NONE DETECTED IN GEDCOM',
+        metrics: 'Unlinked Trees / Distant In-Laws',
+        path: [idA, idB]
+      };
+    }
+
+    function setKinshipPerson(slot, id) {
+      if (slot === 'A') kinshipPersonA = id;
+      if (slot === 'B') kinshipPersonB = id;
+      updateKinshipCards();
+      switchTab('kinship');
+    }
+
+    function updateKinshipCards() {
+      const cardA = document.getElementById('kinshipCardA');
+      const cardB = document.getElementById('kinshipCardB');
+
+      if (cardA) {
+        const indiA = parsedData.individuals[kinshipPersonA];
+        cardA.innerHTML = indiA ? 
+          `<div class="font-bold text-[#00ff66]">${indiA.name} (@${indiA.id}@)</div><div class="text-[11px] text-[#00ff66]/70">BORN: ${indiA.birthDate || 'UNKNOWN'} | SEX: ${indiA.sex}</div>` : 
+          `<span class="italic text-[#00ff66]/50">[NO PERSON A SELECTED]</span>`;
+      }
+
+      if (cardB) {
+        const indiB = parsedData.individuals[kinshipPersonB];
+        cardB.innerHTML = indiB ? 
+          `<div class="font-bold text-[#00ff66]">${indiB.name} (@${indiB.id}@)</div><div class="text-[11px] text-[#00ff66]/70">BORN: ${indiB.birthDate || 'UNKNOWN'} | SEX: ${indiB.sex}</div>` : 
+          `<span class="italic text-[#00ff66]/50">[NO PERSON B SELECTED]</span>`;
+      }
+    }
+
+    function renderKinshipResults() {
+      if (!kinshipPersonA || !kinshipPersonB) {
+        showNotification("PLEASE SELECT BOTH INDIVIDUAL A AND INDIVIDUAL B TO COMPUTE RELATIONSHIP.");
+        return;
+      }
+
+      const res = calculateRelationship(kinshipPersonA, kinshipPersonB);
+
+      document.getElementById('kinshipTitle').textContent = res.title;
+      document.getElementById('kinshipSubtitle').textContent = res.subtitle;
+      document.getElementById('kinshipLcaInfo').textContent = res.lca;
+      document.getElementById('kinshipMetrics').textContent = res.metrics;
+
+      // Build path step visual
+      const pathContainer = document.getElementById('kinshipPathVisual');
+      pathContainer.innerHTML = '';
+
+      if (res.path && res.path.length > 0) {
+        res.path.forEach((pId, idx) => {
+          const person = parsedData.individuals[pId];
+          const isA = pId === kinshipPersonA;
+          const isB = pId === kinshipPersonB;
+
+          const stepEl = document.createElement('div');
+          stepEl.className = 'flex items-center gap-2 py-1 flex-wrap';
+
+          const badge = document.createElement('span');
+          badge.className = `px-2 py-0.5 text-[10px] font-bold border ${isA || isB ? 'bg-[#00ff66] text-[#020d03] border-[#00ff66]' : 'bg-[#07180a] text-[#00ff66] border-[#00aa44]'}`;
+          badge.textContent = isA ? '[INDIVIDUAL A]' : (isB ? '[INDIVIDUAL B]' : `[STEP ${idx}]`);
+
+          const nameLink = document.createElement('a');
+          nameLink.href = '#';
+          nameLink.className = 'hover:underline text-[#00ff66] font-bold';
+          nameLink.textContent = person ? `${person.name} (@${person.id}@)` : `@${pId}@`;
+          nameLink.onclick = (e) => {
+            e.preventDefault();
+            setFocusIndividual(pId);
+            switchTab('visualizer');
+          };
+
+          stepEl.appendChild(badge);
+          stepEl.appendChild(nameLink);
+
+          if (idx < res.path.length - 1) {
+            const arrow = document.createElement('span');
+            arrow.className = 'text-[#00ff66]/50 ml-2';
+            arrow.textContent = '↓';
+            stepEl.appendChild(arrow);
+          }
+
+          pathContainer.appendChild(stepEl);
+        });
+      }
+
+      document.getElementById('kinshipResultBox').classList.remove('hidden');
+    }
+
+    function setupEventListeners() {
+      // Toast Close
+      document.getElementById('toastCloseBtn').addEventListener('click', () => {
+        document.getElementById('toastMessage').classList.add('hidden');
+      });
+
+      // File Browse & Drag Drop
+      const fileInput = document.getElementById('fileInput');
+      const dropZone = document.getElementById('dropZone');
+
+      document.getElementById('btnBrowse').addEventListener('click', () => fileInput.click());
+      dropZone.addEventListener('click', () => fileInput.click());
+
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
+      dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+        if (e.dataTransfer.files.length > 0) {
+          loadGedcomFile(e.dataTransfer.files[0]);
+        }
+      });
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+          loadGedcomFile(e.target.files[0]);
+        }
+      });
+
+      // Demo dataset button
+      document.getElementById('btnLoadDemo').addEventListener('click', () => {
+        processGedcomText(SAMPLE_GEDCOM, "DEMO_SAMPLE_FAMILY.GED");
+      });
+
+      // Change file button in header
+      document.getElementById('btnChangeFile').addEventListener('click', () => {
+        document.getElementById('screenWorkspace').classList.add('hidden');
+        document.getElementById('screenLoader').classList.remove('hidden');
+        document.getElementById('headerActions').classList.add('hidden');
+      });
+
+      // Navigation tabs
+      document.querySelectorAll('.nav-tab').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.dataset.tab));
+      });
+
+      // Controls re-render listeners
+      ['ancestorGenInput', 'descendantGenInput', 'nodeSpacingInput', 'toggleSpouses', 'toggleSiblings'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+          el.addEventListener('input', () => {
+            if (document.getElementById('ancestorGenVal')) document.getElementById('ancestorGenVal').textContent = `${document.getElementById('ancestorGenInput').value} GEN`;
+            if (document.getElementById('descendantGenVal')) document.getElementById('descendantGenVal').textContent = `${document.getElementById('descendantGenInput').value} GEN`;
+            if (document.getElementById('nodeSpacingVal')) {
+              const sp = parseInt(document.getElementById('nodeSpacingInput').value, 10);
+              document.getElementById('nodeSpacingVal').textContent = sp < 90 ? 'COMPACT' : (sp < 170 ? 'WIDE' : 'EXTRA WIDE');
+            }
+            renderSvgTree();
+          });
+          el.addEventListener('change', renderSvgTree);
+        }
+      });
+
+      document.getElementById('btnResetView').addEventListener('click', resetCanvasTransform);
+
+      // SVG Canvas Pan & Zoom Mouse Controls
+      const svg = document.getElementById('treeSvg');
+      svg.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        dragStart = { x: e.clientX - svgPan.x, y: e.clientY - svgPan.y };
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        svgPan.x = e.clientX - dragStart.x;
+        svgPan.y = e.clientY - dragStart.y;
+        applyCanvasTransform();
+      });
+
+      window.addEventListener('mouseup', () => { isDragging = false; });
+
+      svg.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        svgScale = Math.max(0.3, Math.min(3.0, svgScale * zoomFactor));
+        applyCanvasTransform();
+      });
+
+      document.getElementById('btnZoomIn').addEventListener('click', () => {
+        svgScale = Math.min(3.0, svgScale * 1.2);
+        applyCanvasTransform();
+      });
+      document.getElementById('btnZoomOut').addEventListener('click', () => {
+        svgScale = Math.max(0.3, svgScale / 1.2);
+        applyCanvasTransform();
+      });
+      document.getElementById('btnZoomReset').addEventListener('click', resetCanvasTransform);
+
+      <!-- Search Autocomplete for Focus Individual -->
+      const searchInput = document.getElementById('individualSearchInput');
+      const dropdown = document.getElementById('autocompleteDropdown');
+
+      searchInput.addEventListener('input', (e) => {
+        const val = e.target.value.toLowerCase().trim();
+        if (!val) {
+          dropdown.classList.add('hidden');
+          return;
+        }
+
+        const matches = Object.values(parsedData.individuals).filter(i => 
+          i.name.toLowerCase().includes(val) || i.id.toLowerCase().includes(val)
+        ).slice(0, 10);
+
+        if (matches.length === 0) {
+          dropdown.classList.add('hidden');
+          return;
+        }
+
+        dropdown.innerHTML = '';
+        matches.forEach(m => {
+          const item = document.createElement('div');
+          item.className = 'p-2 bg-[#051a0c] hover:bg-[#00ff66] text-[#00ff66] hover:text-[#020d03] cursor-pointer text-xs border-b border-[#00aa44]/40 font-mono transition-colors';
+          item.textContent = `${m.name} (@${m.id}@) - b.${m.birthDate || '?'}`;
+          item.addEventListener('click', () => {
+            searchInput.value = m.name;
+            dropdown.classList.add('hidden');
+            setFocusIndividual(m.id);
+          });
+          dropdown.appendChild(item);
+        });
+        dropdown.classList.remove('hidden');
+      });
+
+      // Directory Search Filter Input
+      document.getElementById('dirSearchInput').addEventListener('input', (e) => {
+        renderDirectoryTable(e.target.value);
+      });
+
+      // Kinship Autocomplete setup
+      function setupKinshipSearch(inputId, dropdownId, slot) {
+        const input = document.getElementById(inputId);
+        const dropdown = document.getElementById(dropdownId);
+        if (!input || !dropdown) return;
+
+        input.addEventListener('input', (e) => {
+          const val = e.target.value.toLowerCase().trim();
+          if (!val) {
+            dropdown.classList.add('hidden');
+            return;
+          }
+
+          const matches = Object.values(parsedData.individuals).filter(i => 
+            i.name.toLowerCase().includes(val) || i.id.toLowerCase().includes(val)
+          ).slice(0, 8);
+
+          if (matches.length === 0) {
+            dropdown.classList.add('hidden');
+            return;
+          }
+
+          dropdown.innerHTML = '';
+          matches.forEach(m => {
+            const item = document.createElement('div');
+            item.className = 'p-2 bg-[#051a0c] hover:bg-[#00ff66] text-[#00ff66] hover:text-[#020d03] cursor-pointer text-xs border-b border-[#00aa44]/40 font-mono transition-colors';
+            item.textContent = `${m.name} (@${m.id}@) - b.${m.birthDate || '?'}`;
+            item.addEventListener('click', () => {
+              input.value = m.name;
+              dropdown.classList.add('hidden');
+              setKinshipPerson(slot, m.id);
+            });
+            dropdown.appendChild(item);
+          });
+          dropdown.classList.remove('hidden');
+        });
+      }
+
+      setupKinshipSearch('kinshipSearchA', 'kinshipDropdownA', 'A');
+      setupKinshipSearch('kinshipSearchB', 'kinshipDropdownB', 'B');
+
+      document.getElementById('btnSwapKinship')?.addEventListener('click', () => {
+        const temp = kinshipPersonA;
+        kinshipPersonA = kinshipPersonB;
+        kinshipPersonB = temp;
+        updateKinshipCards();
+        if (kinshipPersonA && kinshipPersonB) renderKinshipResults();
+      });
+
+      document.getElementById('btnComputeKinship')?.addEventListener('click', renderKinshipResults);
+    }
+
+    function loadGedcomFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        processGedcomText(e.target.result, file.name.toUpperCase());
+      };
+      reader.onerror = function() {
+        showNotification("ERROR READING LOCAL GEDCOM FILE.");
+      };
+      reader.readAsText(file);
+    }
+
+    function processGedcomText(text, fileName) {
+      try {
+        parseGedcom(text);
+        const keys = Object.keys(parsedData.individuals);
+
+        if (keys.length === 0) {
+          showNotification("PARSING WARNING: NO VALID INDIVIDUAL (INDI) RECORDS FOUND IN GEDCOM.");
+          return;
+        }
+
+        document.getElementById('screenLoader').classList.add('hidden');
+        document.getElementById('screenWorkspace').classList.remove('hidden');
+        document.getElementById('headerActions').classList.remove('hidden');
+        document.getElementById('fileMetaTag').textContent = `FILE: ${fileName} (${keys.length} INDIS)`;
+
+        // Set default focus individual (first person or root)
+        focusIndiId = keys[0];
+        resetCanvasTransform();
+        setFocusIndividual(focusIndiId);
+
+        if (keys.length > 1) {
+          kinshipPersonA = keys[0];
+          kinshipPersonB = keys[1];
+        } else {
+          kinshipPersonA = keys[0];
+          kinshipPersonB = keys[0];
+        }
+        updateKinshipCards();
+
+        showNotification(`SUCCESSFULLY PARSED ${keys.length} INDIVIDUALS AND ${Object.keys(parsedData.families).length} FAMILIES.`);
+      } catch (err) {
+        showNotification("GEDCOM PARSE ERROR: " + err.message);
+      }
+    }
+
+    window.onload = function() {
+      setupEventListeners();
+    };
+  </script>
+</body>
+</html>
